@@ -59,6 +59,8 @@ target_link_libraries(MingwDownloader PRIVATE
         fltk_gl
         fltk
         CURL::libcurl
+        ole32
+        shell32
 )
 
 # -----------------------------
@@ -69,8 +71,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(MingwDownloader PRIVATE
         Threads::Threads
-        ole32
-        shell32
 )
 
 find_package(LibArchive REQUIRED)
