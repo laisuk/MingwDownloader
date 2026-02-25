@@ -5,7 +5,7 @@
 A lightweight native Windows GUI utility for downloading and extracting
 prebuilt **MinGW-w64 binaries** from:
 
-https://github.com/niXman/mingw-builds-binaries
+[MinGW-w64 binaries (niXman)](https://github.com/niXman/mingw-builds-binaries)
 
 Built with:
 
@@ -18,7 +18,11 @@ Built with:
 - No external dependencies
 - No 7z.exe required
 
-------------------------------------------------------------------------
+---
+
+![image01](assets/image01.png)
+
+---
 
 ## ✨ Features
 
