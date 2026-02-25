@@ -1,30 +1,50 @@
+// MinGW Builds Downloader (FLTK)
+// ------------------------------------------------------------
+// What this program does:
+//   1) Fetch GitHub releases from niXman/mingw-builds-binaries
+//   2) Parse assets, infer tokens (arch/mrt/exc/crt/rt) from file names
+//   3) Let user filter + download an asset
+//   4) Optional: extract downloaded archive (zip/7z) with libarchive
+//
+// Notes:
+// - FLTK UI must be updated on the UI thread; background work uses Fl::awake.
+// - Download and extraction are done in worker threads.
+// - Path traversal in archives is blocked via safe_join().
+
 #include <FL/Fl.H>
-#include <FL/Fl_Window.H>
+#include <FL/Fl_Box.H>
+#include <FL/Fl_Button.H>
 #include <FL/Fl_Choice.H>
 #include <FL/Fl_Hold_Browser.H>
-#include <FL/Fl_Button.H>
 #include <FL/Fl_Progress.H>
-#include <FL/Fl_Box.H>
+#include <FL/Fl_Window.H>
 #include <FL/fl_ask.H>
-#include <FL/Fl_Native_File_Chooser.H>
-
-#include <curl/curl.h>
-#include "json.hpp"
-
-#include <thread>
-#include <atomic>
-#include <vector>
-#include <string>
+#include <FL/fl_input.H>
 
 #include <archive.h>
 #include <archive_entry.h>
+
+#include <curl/curl.h>
+
+#include "json.hpp" // nlohmann::json (single-header)
+
+#include <atomic>
 #include <filesystem>
 #include <stdexcept>
+#include <string>
+#include <thread>
+#include <vector>
+
+#ifdef _WIN32
+#include <FL/x.H>
+#include <windows.h>
+#include <shobjidl.h> // IFileDialog
+#endif
 
 using json = nlohmann::json;
 
 // ============================================================
-// Data Structures
+// Models / parsing
 // ============================================================
 
 enum class Arch { Any, I686, X86_64 };
@@ -89,7 +109,7 @@ struct Asset {
     std::string name;
     long long size = 0;
     std::string url;
-    AssetInfo info; // ✅ add
+    AssetInfo info; // parsed from `name`
 };
 
 struct Release {
@@ -111,7 +131,7 @@ static Fl_Box *gStatus = nullptr;
 
 static std::atomic<bool> gCancel{false};
 static std::atomic<int> gLastCurlResult{0}; // stores CURLcode
-static std::atomic gProgressValue{0.0}; // progress %
+static std::atomic<double> gProgressValue{0.0}; // progress %
 static std::atomic<int> gRefreshStage{0};
 // 0 = none
 // 1 = network error
@@ -124,10 +144,13 @@ static std::string gExtractErr;
 
 static std::atomic<int> gExtractTotal{0};
 static std::atomic<int> gExtractDone{0};
-static std::atomic<int> gUiMode{0}; // 0=download, 1=extract
+// static std::atomic<int> gUiMode{0}; // 0=download, 1=extract
+
+static Fl_Input *gOutDirInput = nullptr;
+// static Fl_Button *gOutDirBrowseBtn = nullptr;
 
 // ============================================================
-// Utility
+// UI helpers (UI thread only)
 // ============================================================
 
 static void set_status(const std::string &s) {
@@ -143,7 +166,7 @@ static size_t write_callback(void *contents, const size_t size, const size_t nMe
 }
 
 // ============================================================
-// Fetch GitHub Releases
+// GitHub API (fetch + parse)
 // ============================================================
 
 std::string fetch_releases_json() {
@@ -169,10 +192,7 @@ std::string fetch_releases_json() {
 }
 
 // ============================================================
-// JSON Parse
-// ============================================================
-
-bool parse_releases(const std::string &data) {
+static bool parse_releases(const std::string &data) {
     gReleases.clear();
 
     try {
@@ -207,7 +227,7 @@ bool parse_releases(const std::string &data) {
 }
 
 // ============================================================
-// UI Populate
+// Filtering UI
 // ============================================================
 
 static Fl_Choice *gArch = nullptr;
@@ -248,7 +268,7 @@ static void rebuild_asset_list_for_release(const int r_idx) {
 
 // -------
 
-void populate_release_choice() {
+static void populate_release_choice() {
     gRelease->clear();
 
     for (auto &r: gReleases) {
@@ -333,7 +353,7 @@ static void on_reset_filters(Fl_Widget *, void *) {
 }
 
 // ============================================================
-// Download with Progress
+// Download + extraction (worker threads)
 // ============================================================
 
 static void awake_download_done(void *) {
@@ -344,21 +364,26 @@ static void awake_download_done(void *) {
 }
 
 static void awake_update_progress(void *) {
-    gProgress->value(gProgressValue.load());
+    const auto progress =
+            static_cast<float>(gProgressValue.load(std::memory_order_relaxed));
+
+    gProgress->value(progress);
     gProgress->redraw();
 }
 
 static void awake_update_extract_progress(void *) {
-    const int total = gExtractTotal.load();
-    const int done = gExtractDone.load();
+    const int total = gExtractTotal.load(std::memory_order_relaxed);
+    const int done = gExtractDone.load(std::memory_order_relaxed);
 
-    if (total <= 0) {
-        // Unknown total => show 0 (or you can "pulse" if you implement a timer)
-        gProgress->value(0);
-    } else {
-        const double percent = static_cast<double>(done) / static_cast<double>(total) * 100.0;
-        gProgress->value(percent);
+    float percent = 0.0f;
+
+    if (total > 0) {
+        percent = static_cast<float>(
+            (static_cast<double>(done) / static_cast<double>(total)) * 100.0
+        );
     }
+
+    gProgress->value(percent);
     gProgress->redraw();
 }
 
@@ -374,6 +399,7 @@ static int progress_callback(void *,
     return 0;
 }
 
+// Pass 1: count entries so we can show percentage during extraction.
 static int count_archive_entries(const std::string &archivePath, std::string &err) {
     archive *ar = archive_read_new();
     if (!ar) {
@@ -410,10 +436,10 @@ static int count_archive_entries(const std::string &archivePath, std::string &er
     return count;
 }
 
-#ifdef _WIN32
-#include <windows.h>
-
+// Folder picker (Windows implementation).
+// If you want cross-platform: replace this with Fl_Native_File_Chooser.
 static std::string pick_output_dir() {
+#ifdef _WIN32
     std::string result;
 
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -462,8 +488,19 @@ static std::string pick_output_dir() {
 
     CoUninitialize();
     return result;
-}
+#else
+    // TODO: implement non-Windows picker (Fl_Native_File_Chooser works).
+    return {};
 #endif
+}
+
+static void cb_browse_outdir(Fl_Widget *, void *) {
+    const std::string dir = pick_output_dir();
+    if (!dir.empty() && gOutDirInput) {
+        gOutDirInput->value(dir.c_str());
+        gOutDirInput->redraw();
+    }
+}
 
 // ------ Extraction ------
 
@@ -473,12 +510,19 @@ static int copy_archive_data(archive *ar, archive *aw) {
     la_int64_t offset = 0;
 
     for (;;) {
-        int r = archive_read_data_block(ar, &buff, &size, &offset);
-        if (r == ARCHIVE_EOF) return ARCHIVE_OK;
-        if (r != ARCHIVE_OK) return r;
+        const int r = archive_read_data_block(ar, &buff, &size, &offset);
 
-        r = archive_write_data_block(aw, buff, size, offset);
-        if (r != ARCHIVE_OK) return r;
+        if (r == ARCHIVE_EOF)
+            return ARCHIVE_OK;
+
+        if (r != ARCHIVE_OK)
+            return r;
+
+        const la_ssize_t w =
+                archive_write_data_block(aw, buff, size, offset);
+
+        if (w < ARCHIVE_OK) // error is negative
+            return static_cast<int>(w);
     }
 }
 
@@ -487,8 +531,10 @@ static std::filesystem::path safe_join(const std::filesystem::path &base,
     auto out = (base / rel).lexically_normal();
     const auto baseN = base.lexically_normal();
 
-    // Block traversal: ensure normalized output starts with base
-    const auto baseStr = baseN.native();
+    // Block traversal: ensure normalized output starts with base.
+    // NOTE: This is a simple prefix check; it assumes the archive entries are
+    // relative paths. We already skip absolute paths above.
+    const auto &baseStr = baseN.native();
     if (const auto outStr = out.native(); outStr.size() < baseStr.size() || outStr.compare(0, baseStr.size(), baseStr)
                                           != 0) {
         throw std::runtime_error("Blocked path traversal in archive entry");
@@ -603,11 +649,15 @@ static void awake_extract_done(void *) {
     }
 }
 
-// ------ Extraction End ------
-// Note: Do not set const for pointer
-static size_t file_write_cb(void *ptr, const size_t size, const size_t nMemBytes, void *userdata) {
-    const auto fp = static_cast<FILE *>(userdata);
-    return fwrite(ptr, size, nMemBytes, fp);
+// ------ Download helpers ------
+static size_t file_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
+    FILE *const fp = static_cast<FILE *>(userdata);
+    if (!fp) return 0;
+
+    // size*nmemb is what cURL expects caller to consume
+    const size_t n = size * nmemb;
+    const size_t written = fwrite(ptr, 1, n, fp);
+    return written;
 }
 
 static std::string gUiText;
@@ -621,7 +671,7 @@ static void post_status(const char *s) {
     Fl::awake(awake_set_status);
 }
 
-void download_file(const std::string &url, const std::string &outPath) {
+static void download_file(const std::string &url, const std::string &outPath) {
     CURL *curl = curl_easy_init();
     if (!curl) {
         gLastCurlResult = static_cast<int>(CURLE_FAILED_INIT);
@@ -761,9 +811,10 @@ static void start_download(const bool extract_after) {
 
     const auto &asset = gReleases[r_idx].assets[static_cast<size_t>(real_idx)];
 
-    const std::string outDir = pick_output_dir();
+    // const std::string outDir = pick_output_dir();
+    const std::string outDir = gOutDirInput ? gOutDirInput->value() : "";
     if (outDir.empty()) {
-        set_status("Cancelled.");
+        set_status("Please select output directory.");
         return;
     }
 
@@ -799,11 +850,8 @@ static void on_cancel(Fl_Widget *, void *) {
 }
 
 // ============================================================
-// Main
+// Main / UI layout
 // ============================================================
-#ifdef _WIN32
-#include <FL/x.H>
-#endif
 
 static void center_window(Fl_Window &win) {
     int sx, sy, sw, sh;
@@ -820,7 +868,7 @@ int main() {
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
     constexpr int W = 860;
-    constexpr int H = 480;
+    constexpr int H = 520;
     Fl_Window win(W, H, "MinGW Builds Downloader");
 
     // ---- layout constants ----
@@ -890,14 +938,31 @@ int main() {
     // =========================
     constexpr int listY = filterY + FILTER_TOTAL_H + 12;
     constexpr int listH = 280;
+
     gAssets = new Fl_Hold_Browser(x0, listY, W - 2 * M, listH);
     gAssets->textfont(FL_HELVETICA);
     gAssets->textsize(16);
 
     // =========================
+    // Output folder row (NEW)
+    // =========================
+    constexpr int outRowY = listY + listH + 10;
+    constexpr int outRowH = 28;
+
+    auto *outLabel = new Fl_Box(x0, outRowY, 110, outRowH, "Output Folder:");
+    outLabel->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+    gOutDirInput = new Fl_Input(x0 + 110, outRowY,
+                                W - 2 * M - 110 - 90 - GAP,
+                                outRowH);
+
+    auto *btnBrowse = new Fl_Button(x0 + W - 2 * M - 90, outRowY, 90, outRowH, "Browse");
+    btnBrowse->callback(cb_browse_outdir);
+
+    // =========================
     // Bottom row: buttons + progress
     // =========================
-    constexpr int bottomY = listY + listH + 10;
+    constexpr int bottomY = outRowY + outRowH + 10;
     constexpr int btnH = 30;
 
     auto *btnDownload = new Fl_Button(x0, bottomY, 160, btnH, "Download");
@@ -912,6 +977,7 @@ int main() {
     // progress starts after buttons
     constexpr int progX = x0 + 160 + GAP + 180 + GAP + 90 + GAP;
     constexpr int progW = W - M - progX;
+
     gProgress = new Fl_Progress(progX, bottomY, progW, btnH);
     gProgress->minimum(0);
     gProgress->maximum(100);
@@ -920,7 +986,7 @@ int main() {
     // Status bar
     // =========================
     constexpr int statusY = bottomY + btnH + 8;
-    gStatus = new Fl_Box(x0, statusY, W - 2 * M, 24, "Ready.");
+    gStatus = new Fl_Box(x0, statusY, W - 2 * M, 26, "Ready.");
     gStatus->box(FL_THIN_DOWN_BOX);
     gStatus->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
 
@@ -931,7 +997,7 @@ int main() {
 
 #ifdef _WIN32
     if (HICON hIcon = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(101))) {
-        const HWND hwnd = fl_xid(&win);
+        HWND hwnd = fl_xid(&win);
         SendMessage(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
         SendMessage(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
     }

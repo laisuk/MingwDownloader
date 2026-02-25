@@ -34,14 +34,14 @@ find_package(CURL CONFIG REQUIRED)
 # -----------------------------
 add_executable(MingwDownloader
         src/main.cpp
-        # add more .cpp here if you split files
+        # add more .cpp here if there are split files
         assets/app.rc
 )
 
 # -----------------------------
 # Includes
 # -----------------------------
-# Put your single-include json.hpp here:
+# Put single-include json.hpp here:
 #   third_party/nlohmann/json.hpp
 # or:
 #   include/json.hpp
