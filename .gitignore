@@ -1,0 +1,89 @@
+# ========================================
+# CLion / IntelliJ
+# ========================================
+.idea/
+cmake-build-*/
+out/
+
+# ========================================
+# CMake
+# ========================================
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CMakeUserPresets.json
+
+# ========================================
+# Build directories (generic)
+# ========================================
+build/
+Build/
+bin/
+lib/
+dist/
+
+# ========================================
+# MinGW / Make
+# ========================================
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.manifest
+*.pdb
+
+# ========================================
+# Static / Release artifacts
+# ========================================
+*.zip
+*.7z
+*.tar
+*.gz
+
+# ========================================
+# Windows system files
+# ========================================
+Thumbs.db
+Desktop.ini
+
+# ========================================
+# Logs
+# ========================================
+*.log
+
+# ========================================
+# Temporary files
+# ========================================
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# ========================================
+# vcpkg (if using installed directory locally)
+# ========================================
+vcpkg_installed/
+installed/
+packages/
+buildtrees/
+
+# Keep manifest if you use it
+!vcpkg.json
+
+# ========================================
+# VSCode (if opened once)
+# ========================================
+.vscode/
+
+# ========================================
+# Generated resource files (optional)
+# ========================================
+*.res
+*.rc~
