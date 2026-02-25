@@ -1,0 +1,4 @@
+No Extraction:
+https://www.virustotal.com/gui/file/55ee94eb2d1666adc74e443f73e532245f07c483f01c86cddfd06da4514c4e24/detection
+With Extraction:
+https://www.virustotal.com/gui/file/52309e7c9c3be17c879a93de6e06e88508411cc21cbdbf981d3971c734982492/detection
