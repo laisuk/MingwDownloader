@@ -10,8 +10,7 @@ jobs:
     env:
       BUILD_TYPE: Release
       VCPKG_TRIPLET: x64-windows-static
-      # Make our cloned vcpkg the single source of truth (avoid VS-injected VCPKG_ROOT)
-      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+      VCPKG_WDIR: ${{ github.workspace }}\vcpkg
 
     steps:
       - name: Checkout
@@ -28,9 +27,8 @@ jobs:
       - name: Clone vcpkg
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$env:VCPKG_ROOT"
-          cd "$env:VCPKG_ROOT"
-          .\bootstrap-vcpkg.bat
+          git clone https://github.com/microsoft/vcpkg.git "$env:VCPKG_WDIR"
+          cmd /c """$env:VCPKG_WDIR\bootstrap-vcpkg.bat"""
 
       - name: Cache vcpkg artifacts
         uses: actions/cache@v4
@@ -48,21 +46,20 @@ jobs:
       - name: Install dependencies (vcpkg)
         shell: pwsh
         run: |
-          $vcpkgRoot = "$env:VCPKG_ROOT"
+          $vcpkgRoot = "$env:VCPKG_WDIR"
           $vcpkg = "$vcpkgRoot\vcpkg.exe"
 
-          # Explicit root avoids the "ignoring mismatched VCPKG_ROOT" warning.
           & $vcpkg --vcpkg-root $vcpkgRoot install `
-            fltk `
-            curl `
-            libarchive `
+            "fltk" `
+            "curl" `
+            "libarchive[core,lzma]" `
             --triplet $env:VCPKG_TRIPLET `
             --host-triplet x64-windows
 
       - name: Configure (CMake)
         shell: pwsh
         run: |
-          $vcpkgRoot = "$env:VCPKG_ROOT"
+          $vcpkgRoot = "$env:VCPKG_WDIR"
 
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
