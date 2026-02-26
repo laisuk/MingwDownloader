@@ -62,12 +62,29 @@ jobs:
           $vcpkgRoot = "$env:GITHUB_WORKSPACE\vcpkg"
           $trip = "$env:VCPKG_TRIPLET"
 
+          Write-Host "=== ENV DEBUG ==="
+          Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
+          Write-Host "VCPKG_WDIR        = $env:VCPKG_WDIR"
+          Write-Host "VCPKG_ROOT        = $env:VCPKG_ROOT"
+          Write-Host "VCPKG_TRIPLET     = $trip"
+          Write-Host "Toolchain path    = $vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          Write-Host "FLTK_DIR          = $vcpkgRoot\installed\$trip\share\fltk"
+          Write-Host ""
+
+          Write-Host "=== CHECK FILE EXISTENCE ==="
+          Test-Path "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" | Write-Host "Toolchain exists?"
+          Test-Path "$vcpkgRoot\installed\$trip\share\fltk\FLTKConfig.cmake" | Write-Host "FLTKConfig exists?"
+          Write-Host ""
+
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
             -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=$trip `
             -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed" `
-            -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk"
+            -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk" `
+          -DCURL_DIR="$vcpkgRoot\installed\$trip\share\curl" `
+            --trace-expand `
+            --debug-find
 
       - name: Build
         shell: pwsh
