@@ -59,12 +59,15 @@ jobs:
       - name: Configure (CMake)
         shell: pwsh
         run: |
-          $vcpkgRoot = "$env:GITHUB_WORKSPACE\vcpkg"   # or your VCPKG_WDIR
+          $vcpkgRoot = "$env:GITHUB_WORKSPACE\vcpkg"
+          $trip = "$env:VCPKG_TRIPLET"
+
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
             -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET `
-            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed"
+            -DVCPKG_TARGET_TRIPLET=$trip `
+            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed" `
+            -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk"
 
       - name: Build
         shell: pwsh
