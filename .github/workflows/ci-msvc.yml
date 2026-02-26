@@ -50,8 +50,8 @@ jobs:
           $vcpkg = "$vcpkgRoot\vcpkg.exe"
 
           & $vcpkg --vcpkg-root $vcpkgRoot install `
-            "fltk" `
-            "curl" `
+            "fltk[core,opengl]" `
+            "curl[core,non-http,sspi,ssl]" `
             "libarchive[core,lzma]" `
             --triplet $env:VCPKG_TRIPLET `
             --host-triplet x64-windows
@@ -59,12 +59,12 @@ jobs:
       - name: Configure (CMake)
         shell: pwsh
         run: |
-          $vcpkgRoot = "$env:VCPKG_WDIR"
-
+          $vcpkgRoot = "$env:GITHUB_WORKSPACE\vcpkg"   # or your VCPKG_WDIR
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
             -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET
+            -DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET `
+            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed"
 
       - name: Build
         shell: pwsh
