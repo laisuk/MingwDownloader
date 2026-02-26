@@ -4,3 +4,5 @@ With Extraction:
 https://www.virustotal.com/gui/file/52309e7c9c3be17c879a93de6e06e88508411cc21cbdbf981d3971c734982492/detection
 With output folder selection UI:
 https://www.virustotal.com/gui/file/d732e2751406f9c6ca1ef6461745f03d4bd113bd6efb7f97bb9d1710db23614e/detection
+MSVC Build:
+https://www.virustotal.com/gui/file/0e7728778eeeb765746f8a2397fd2e5695df51277654e0c92c47af564cb1bc8d/detection
