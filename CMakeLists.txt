@@ -10,6 +10,7 @@ set(CMAKE_TOOLCHAIN_FILE "D:/lib/vcpkg/scripts/buildsystems/vcpkg.cmake"
 if (NOT DEFINED VCPKG_TARGET_TRIPLET)
     if (MSVC)
         set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
+#        list(APPEND CMAKE_PREFIX_PATH "D:/lib/vcpkg/installed/x64-windows-static")
     else ()
         set(VCPKG_TARGET_TRIPLET "x64-mingw-static" CACHE STRING "")
     endif ()
