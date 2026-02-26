@@ -3,8 +3,17 @@ cmake_minimum_required(VERSION 3.23)
 # -----------------------------
 # vcpkg (single owner)
 # -----------------------------
-set(CMAKE_TOOLCHAIN_FILE "D:/lib/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "" FORCE)
+if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    if (DEFINED ENV{VCPKG_ROOT})
+        set(CMAKE_TOOLCHAIN_FILE
+                "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "" FORCE)
+    else()
+        set(CMAKE_TOOLCHAIN_FILE
+                "D:/lib/vcpkg/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "" FORCE)
+    endif()
+endif()
 
 # Choose triplet by toolchain
 if (NOT DEFINED VCPKG_TARGET_TRIPLET)
