@@ -679,7 +679,6 @@ static void download_file(const std::string &url, const std::string &outPath) {
         return;
     }
 
-    // FILE *fp = fopen(outPath.c_str(), "wb");
     FILE *fp = nullptr;
 #ifdef _MSC_VER
     if (fopen_s(&fp, outPath.c_str(), "wb") != 0 || !fp) {
