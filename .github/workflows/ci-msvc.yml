@@ -1,9 +1,6 @@
 name: CI (MSVC, windows-latest)
 
 on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -13,6 +10,8 @@ jobs:
     env:
       BUILD_TYPE: Release
       VCPKG_TRIPLET: x64-windows-static
+      # Make our cloned vcpkg the single source of truth (avoid VS-injected VCPKG_ROOT)
+      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
 
     steps:
       - name: Checkout
@@ -29,8 +28,8 @@ jobs:
       - name: Clone vcpkg
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
-          cd "$env:GITHUB_WORKSPACE\vcpkg"
+          git clone https://github.com/microsoft/vcpkg.git "$env:VCPKG_ROOT"
+          cd "$env:VCPKG_ROOT"
           .\bootstrap-vcpkg.bat
 
       - name: Cache vcpkg artifacts
@@ -41,24 +40,33 @@ jobs:
             vcpkg\buildtrees
             vcpkg\packages
             vcpkg\installed
-          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+            C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}-
+            vcpkg-${{ runner.os }}-
 
       - name: Install dependencies (vcpkg)
         shell: pwsh
         run: |
-          $vcpkg = "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe"
-          & $vcpkg install fltk curl libarchive --triplet $env:VCPKG_TRIPLET
+          $vcpkgRoot = "$env:VCPKG_ROOT"
+          $vcpkg = "$vcpkgRoot\vcpkg.exe"
+
+          # Explicit root avoids the "ignoring mismatched VCPKG_ROOT" warning.
+          & $vcpkg --vcpkg-root $vcpkgRoot install `
+            fltk `
+            curl `
+            libarchive `
+            --triplet $env:VCPKG_TRIPLET `
+            --host-triplet x64-windows
 
       - name: Configure (CMake)
         shell: pwsh
         run: |
-          # Your CMakeLists uses VCPKG_ROOT if present
-          $env:VCPKG_ROOT = "$env:GITHUB_WORKSPACE\vcpkg"
+          $vcpkgRoot = "$env:VCPKG_ROOT"
 
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
+            -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET
 
       - name: Build
