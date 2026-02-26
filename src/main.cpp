@@ -679,8 +679,16 @@ static void download_file(const std::string &url, const std::string &outPath) {
         return;
     }
 
-    FILE *fp = fopen(outPath.c_str(), "wb");
+    // FILE *fp = fopen(outPath.c_str(), "wb");
+    FILE *fp = nullptr;
+#ifdef _MSC_VER
+    if (fopen_s(&fp, outPath.c_str(), "wb") != 0 || !fp) {
+#else
+    fp = fopen(outPath.c_str(), "wb");
     if (!fp) {
+#endif
+
+    // if (!fp) {
         curl_easy_cleanup(curl);
         gLastCurlResult = static_cast<int>(CURLE_WRITE_ERROR);
         Fl::awake(awake_download_done);
