@@ -686,8 +686,6 @@ static void download_file(const std::string &url, const std::string &outPath) {
     fp = fopen(outPath.c_str(), "wb");
     if (!fp) {
 #endif
-
-    // if (!fp) {
         curl_easy_cleanup(curl);
         gLastCurlResult = static_cast<int>(CURLE_WRITE_ERROR);
         Fl::awake(awake_download_done);
