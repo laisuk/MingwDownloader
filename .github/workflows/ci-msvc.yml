@@ -59,22 +59,32 @@ jobs:
       - name: Configure (CMake)
         shell: pwsh
         run: |
-          $vcpkgRoot = "$env:GITHUB_WORKSPACE\vcpkg"
+          $vcpkgRoot = "$env:VCPKG_WDIR"
           $trip = "$env:VCPKG_TRIPLET"
 
           Write-Host "=== ENV DEBUG ==="
           Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
-          Write-Host "VCPKG_WDIR        = $env:VCPKG_WDIR"
-          Write-Host "VCPKG_ROOT        = $env:VCPKG_ROOT"
-          Write-Host "VCPKG_TRIPLET     = $trip"
-          Write-Host "Toolchain path    = $vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
-          Write-Host "FLTK_DIR          = $vcpkgRoot\installed\$trip\share\fltk"
+          Write-Host "VCPKG_WDIR       = $env:VCPKG_WDIR"
+          Write-Host "VCPKG_ROOT       = $env:VCPKG_ROOT"
+          Write-Host "VCPKG_TRIPLET    = $trip"
+          Write-Host "Toolchain path   = $vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          Write-Host "FLTK_DIR         = $vcpkgRoot\installed\$trip\share\fltk"
+          Write-Host "CURL_DIR         = $vcpkgRoot\installed\$trip\share\curl"
           Write-Host ""
 
           Write-Host "=== CHECK FILE EXISTENCE ==="
-          Test-Path "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" | Write-Host "Toolchain exists?"
-          Test-Path "$vcpkgRoot\installed\$trip\share\fltk\FLTKConfig.cmake" | Write-Host "FLTKConfig exists?"
+          $toolchainOk = Test-Path "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          $fltkCfgOk   = Test-Path "$vcpkgRoot\installed\$trip\share\fltk\FLTKConfig.cmake"
+          $curlCfgOk   = Test-Path "$vcpkgRoot\installed\$trip\share\curl\CURLConfig.cmake"
+          Write-Host "Toolchain exists?  $toolchainOk"
+          Write-Host "FLTKConfig exists? $fltkCfgOk"
+          Write-Host "CURLConfig exists? $curlCfgOk"
           Write-Host ""
+
+          if (-not $toolchainOk) { throw "Missing vcpkg toolchain file." }
+
+          # Optional: clean old cache if you previously configured with wrong toolchain
+          Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
@@ -82,8 +92,7 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=$trip `
             -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed" `
             -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk" `
-          -DCURL_DIR="$vcpkgRoot\installed\$trip\share\curl" `
-            --trace-expand `
+            -DCURL_DIR="$vcpkgRoot\installed\$trip\share\curl" `
             --debug-find
 
       - name: Build
