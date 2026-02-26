@@ -255,14 +255,27 @@ static void rebuild_asset_list_for_release(const int r_idx) {
     gAssets->clear();
     gAssetIndexMap.clear();
 
-    if (r_idx < 0 || r_idx >= static_cast<int>(gReleases.size())) return;
+    if (r_idx < 0 || r_idx >= static_cast<int>(gReleases.size()))
+        return;
 
     const auto &rel = gReleases[r_idx];
+
     for (int i = 0; i < static_cast<int>(rel.assets.size()); ++i) {
-        if (const auto &a = rel.assets[i]; asset_matches(a)) {
-            gAssets->add(a.name.c_str());
-            gAssetIndexMap.push_back(i);
-        }
+        const auto &a = rel.assets[i];
+
+        if (!asset_matches(a))
+            continue;
+
+        const double mb = static_cast<double>(a.size) / (1024.0 * 1024.0);
+
+        char line[1024];
+        std::snprintf(line, sizeof(line),
+                      "%-68s  (%6.1f MB)",
+                      a.name.c_str(),
+                      mb);
+
+        gAssets->add(line);
+        gAssetIndexMap.push_back(i);
     }
 }
 
@@ -683,8 +696,8 @@ static void download_file(const std::string &url, const std::string &outPath) {
 #ifdef _MSC_VER
     if (fopen_s(&fp, outPath.c_str(), "wb") != 0 || !fp) {
 #else
-    fp = fopen(outPath.c_str(), "wb");
-    if (!fp) {
+        fp = fopen(outPath.c_str(), "wb");
+        if (!fp) {
 #endif
         curl_easy_cleanup(curl);
         gLastCurlResult = static_cast<int>(CURLE_WRITE_ERROR);
@@ -945,7 +958,8 @@ int main() {
     constexpr int listH = 280;
 
     gAssets = new Fl_Hold_Browser(x0, listY, W - 2 * M, listH);
-    gAssets->textfont(FL_HELVETICA);
+    // gAssets->textfont(FL_HELVETICA);
+    gAssets->textfont(FL_COURIER);
     gAssets->textsize(16);
 
     // =========================

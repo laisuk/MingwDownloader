@@ -1,0 +1,106 @@
+name: CI (MSVC, windows-latest)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-msvc:
+    runs-on: windows-latest
+
+    env:
+      BUILD_TYPE: Release
+      VCPKG_TRIPLET: x64-windows-static
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Clone vcpkg into the workspace (so we can point CMake toolchain to it)
+      - name: Clone vcpkg
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
+          cd "$env:GITHUB_WORKSPACE\vcpkg"
+          .\bootstrap-vcpkg.bat
+
+      # Cache vcpkg downloads/buildtrees/installed between runs
+      - name: Cache vcpkg artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg\downloads
+            vcpkg\buildtrees
+            vcpkg\packages
+            vcpkg\installed
+          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}-${{ hashFiles('vcpkg/**/ports/**', 'vcpkg/**/triplets/**') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}-
+
+      - name: Install dependencies (vcpkg)
+        shell: pwsh
+        run: |
+          $vcpkg = "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe"
+          & $vcpkg install fltk curl libarchive --triplet $env:VCPKG_TRIPLET
+
+      # Your CMakeLists currently FORCE-sets CMAKE_TOOLCHAIN_FILE to D:/lib/vcpkg/...
+      # That breaks CI. This patch turns it into: set(...) only if NOT already defined.
+      - name: Patch CMakeLists toolchain hardcode (CI only)
+        shell: pwsh
+        run: |
+          $cmake = "CMakeLists.txt"
+          $text = Get-Content $cmake -Raw
+
+          # Replace the forced toolchain set with a conditional block.
+          # (Keeps your "single owner" idea but makes CI portable.)
+          $pattern = 'set\s*\(\s*CMAKE_TOOLCHAIN_FILE\s*"D:/lib/vcpkg/scripts/buildsystems/vcpkg\.cmake"\s*[\s\S]*?FORCE\s*\)'
+          $replacement = @'
+  # -----------------------------
+  # vcpkg (single owner)
+  # -----------------------------
+  # NOTE (CI portability):
+  # Only set a default toolchain if caller didn't provide one.
+  if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+  CACHE STRING "" FORCE)
+  endif()
+  '@
+  
+  if ($text -match $pattern) {
+  $text = [regex]::Replace($text, $pattern, $replacement)
+  } else {
+  Write-Host "WARN: Toolchain hardcode pattern not found. No patch applied."
+}
+
+  Set-Content $cmake $text -Encoding UTF8
+
+  - name: Configure (CMake)
+    shell: pwsh
+    run: |
+      $env:VCPKG_ROOT = "$env:GITHUB_WORKSPACE\vcpkg"
+      
+      cmake -S . -B build -G "Ninja" `
+        -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE `
+        -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+        -DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET
+
+  - name: Build
+    shell: pwsh
+    run: |
+      cmake --build build --config $env:BUILD_TYPE
+
+  - name: Upload artifact (exe)
+    uses: actions/upload-artifact@v4
+    with:
+      name: MingwDownloader-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}
+      path: |
+        build/MingwDownloader.exe
+        build/Release/MingwDownloader.exe
+      if-no-files-found: error
