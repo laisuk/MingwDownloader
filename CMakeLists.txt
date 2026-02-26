@@ -49,7 +49,9 @@ option(MINGW_DOWNLOADER_STATIC_RUNTIME "Prefer static GCC/Stdlib where possible"
 # -----------------------------
 #find_package(fltk CONFIG REQUIRED)
 find_package(FLTK CONFIG REQUIRED)
+#find_package(FLTK REQUIRED)
 find_package(CURL CONFIG REQUIRED)
+#find_package(CURL REQUIRED)
 find_package(LibArchive REQUIRED)
 
 # -----------------------------
