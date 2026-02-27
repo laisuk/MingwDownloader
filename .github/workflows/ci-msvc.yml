@@ -92,9 +92,7 @@ jobs:
             -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
             -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET="$trip" `
-            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed" `
-            -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk" `
-            -DCURL_DIR="$vcpkgRoot\installed\$trip\share\curl"
+            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed"
 
       - name: Build
         shell: pwsh
