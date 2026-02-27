@@ -60,9 +60,9 @@ jobs:
         shell: pwsh
         run: |
           $vcpkgRoot = "$env:VCPKG_WDIR"
+          $trip = "$env:VCPKG_TRIPLET"
           $env:VCPKG_ROOT = $vcpkgRoot
           $env:VCPKG_INSTALLATION_ROOT = $vcpkgRoot
-          $trip = "$env:VCPKG_TRIPLET"
 
           Write-Host "=== ENV DEBUG ==="
           Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
@@ -88,19 +88,13 @@ jobs:
           # Optional: clean old cache if you previously configured with wrong toolchain
           Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 
-#          cmake -S . -B build -G "Ninja" `
-#            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
-#            -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
-#            -DVCPKG_TARGET_TRIPLET="$trip" `
-#            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed" `
-#            -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk" `
-#            -DCURL_DIR="$vcpkgRoot\installed\$trip\share\curl"
-
-         cmake -S . -B build -G "Ninja" `
-         -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
-         -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
-         -DVCPKG_TARGET_TRIPLET="$trip" `
-         -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed"
+          cmake -S . -B build -G "Ninja" `
+            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
+            -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET="$trip" `
+            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed" `
+            -DFLTK_DIR="$vcpkgRoot\installed\$trip\share\fltk" `
+            -DCURL_DIR="$vcpkgRoot\installed\$trip\share\curl"
 
       - name: Build
         shell: pwsh
