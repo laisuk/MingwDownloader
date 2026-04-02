@@ -270,7 +270,8 @@ static void rebuild_asset_list_for_release(const int r_idx) {
 
         char line[1024];
         std::snprintf(line, sizeof(line),
-                      "%-68s  (%6.1f MB)",
+                      // "%-68s  [%6.1f MB]",
+                      "%-68s  %6.1f MB",
                       a.name.c_str(),
                       mb);
 
