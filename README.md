@@ -1,6 +1,6 @@
 # MinGW Builds Downloader
 
-[![VirusTotal Scan](https://img.shields.io/badge/VirusTotal-0%2F72-brightgreen?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/d732e2751406f9c6ca1ef6461745f03d4bd113bd6efb7f97bb9d1710db23614e/detection)
+[![VirusTotal Scan](https://img.shields.io/badge/VirusTotal-0%2F72-brightgreen?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/62de86dbb51d07f2b9e54aea91d17bb0e500869464190c2bf9c63bc370aa753e/detection)
 [![Total Downloads](https://img.shields.io/github/downloads/laisuk/MingwDownloader/total.svg)](https://github.com/laisuk/MingwDownloader/releases)
 
 A lightweight native Windows GUI utility for downloading and extracting
