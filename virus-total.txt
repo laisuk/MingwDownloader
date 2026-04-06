@@ -9,3 +9,5 @@ https://www.virustotal.com/gui/file/0e7728778eeeb765746f8a2397fd2e5695df51277654
 
 v1.0.1 MinGW
 https://www.virustotal.com/gui/file/62de86dbb51d07f2b9e54aea91d17bb0e500869464190c2bf9c63bc370aa753e/detection
+v1.0.1 MSVC
+https://www.virustotal.com/gui/file/5c9ff3122ca9bb3503e46c293fd25b4a60a1da3032697728bd42789f30d3dcf6/detection
