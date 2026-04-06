@@ -30,7 +30,7 @@ if (WIN32 AND DEFINED VCPKG_INSTALLED_DIR)
     list(PREPEND CMAKE_PREFIX_PATH "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
 endif()
 
-project(MingwDownloader LANGUAGES C CXX)
+project(MingwDownloader VERSION 1.0.1.0 LANGUAGES C CXX RC)
 
 # -----------------------------
 # Language / standard

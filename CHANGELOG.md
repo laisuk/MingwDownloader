@@ -6,6 +6,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ------------------------------------------------------------------------
 
+## [1.0.1] - 2026-04-06
+
+### Changed
+
+- UI optimization.
+- Added FileVersion WinRes
+
+---
+
 ## [1.0.0] - 2026-02-25
 
 ### Added
