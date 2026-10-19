@@ -106,6 +106,10 @@ add_executable(MingwDownloader
         src/main.cpp
         assets/app.rc)
 
+target_compile_definitions(MingwDownloader PRIVATE
+        APP_VERSION="${PROJECT_VERSION}"
+)
+
 # The project uses a vendored single-header nlohmann/json.hpp.
 target_include_directories(MingwDownloader PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"

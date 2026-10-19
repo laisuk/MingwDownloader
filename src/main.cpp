@@ -958,7 +958,7 @@ int main() {
 
     constexpr int W = 860;
     constexpr int H = 520;
-    Fl_Window win(W, H, "MinGW Builds Downloader");
+    Fl_Window win(W, H, "MinGW Builds Downloader v" APP_VERSION);
 
     // ---- layout constants ----
     constexpr int M = 12; // outer margin
