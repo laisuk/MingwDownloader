@@ -1,0 +1,2 @@
+# Preserve upstream payload bytes so SHA256SUMS survives Windows checkouts.
+installed/** -text

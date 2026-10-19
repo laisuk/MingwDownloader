@@ -1,0 +1,269 @@
+{
+  "$schema": "https://raw.githubusercontent.com/spdx/spdx-spec/v2.2.1/schemas/spdx-schema.json",
+  "spdxVersion": "SPDX-2.2",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "documentNamespace": "https://spdx.org/spdxdocs/libarchive-x64-mingw-static-3.7.8#1-0dcd0810-7bd5-4641-9cd6-b9bd7ac4d1b1",
+  "name": "libarchive:x64-mingw-static@3.7.8#1 4a0c76a632a3fa1f78530a4b847cb00b0fea0a0de9185c371add33ef7ce9a2ce",
+  "creationInfo": {
+    "creators": [
+      "Tool: vcpkg-2025-06-20-ef7c0d541124bbdd334a03467e7edb6c3364d199"
+    ],
+    "created": "2026-02-25T10:40:16Z"
+  },
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "GENERATES",
+      "relatedSpdxElement": "SPDXRef-binary"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-0"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-1"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-2"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-3"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-4"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-5"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-6"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-7"
+    },
+    {
+      "spdxElementId": "SPDXRef-port",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-file-8"
+    },
+    {
+      "spdxElementId": "SPDXRef-binary",
+      "relationshipType": "GENERATED_FROM",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-0",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-1",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-2",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-3",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-4",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-5",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-6",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-7",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-8",
+      "relationshipType": "CONTAINED_BY",
+      "relatedSpdxElement": "SPDXRef-port"
+    },
+    {
+      "spdxElementId": "SPDXRef-file-8",
+      "relationshipType": "DEPENDENCY_MANIFEST_OF",
+      "relatedSpdxElement": "SPDXRef-port"
+    }
+  ],
+  "packages": [
+    {
+      "name": "libarchive",
+      "SPDXID": "SPDXRef-port",
+      "versionInfo": "3.7.8#1",
+      "downloadLocation": "git+https://github.com/Microsoft/vcpkg#ports/libarchive",
+      "homepage": "https://www.libarchive.org",
+      "licenseConcluded": "LicenseRef-vcpkg-null",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "description": "Library for reading and writing streaming archives",
+      "comment": "This is the port (recipe) consumed by vcpkg."
+    },
+    {
+      "name": "libarchive:x64-mingw-static",
+      "SPDXID": "SPDXRef-binary",
+      "versionInfo": "4a0c76a632a3fa1f78530a4b847cb00b0fea0a0de9185c371add33ef7ce9a2ce",
+      "downloadLocation": "NONE",
+      "licenseConcluded": "LicenseRef-vcpkg-null",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "comment": "This is a binary package built by vcpkg."
+    },
+    {
+      "SPDXID": "SPDXRef-resource-0",
+      "name": "libarchive/libarchive",
+      "downloadLocation": "git+https://github.com/libarchive/libarchive@v3.7.8",
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "checksums": [
+        {
+          "algorithm": "SHA512",
+          "checksumValue": "5ce1fb0b0108a1f5a1547fbecc261e0438b449eee7253eec0b66452462c052b09c8e6cccd0ed9e7fd0c55e5862b334519b17da4f72b1e0196e73bc90ad97c983"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "fileName": "./disable-warnings.patch",
+      "SPDXID": "SPDXRef-file-0",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "ac64e15d746c77dddcacc940a267cca502a80260c24a54f199e3576704b10e9f"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./fix-buildsystem.patch",
+      "SPDXID": "SPDXRef-file-1",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "6466f75f58cbdb013656e37d8478eafdb55faaa65a6b4221a047059e788ea582"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./fix-cmake-version.patch",
+      "SPDXID": "SPDXRef-file-2",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "91e792f575f9728965e8fb75dda807826012028b885e7a07c31ec248c982eef9"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./fix-cpu-set.patch",
+      "SPDXID": "SPDXRef-file-3",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e2d6840ea73fe52bbff9497eff84af66c62917fbce79dda657dfe479b9e479aa"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./fix-deps.patch",
+      "SPDXID": "SPDXRef-file-4",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "dac469ba67d057b80d961ba6d7f40bdb61475a38dddc2867ceddf6b44a54b00b"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./portfile.cmake",
+      "SPDXID": "SPDXRef-file-5",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "ca01cca042449d2186d66819fedf1f577e22cecff37e02599790ea4a746c903f"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./usage",
+      "SPDXID": "SPDXRef-file-6",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e51b6cf6d6bd5e259e0d141659a7c9d4675d1da8d03dbcbdb012dd837cf64485"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./vcpkg-cmake-wrapper.cmake.in",
+      "SPDXID": "SPDXRef-file-7",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "cc113f0231d0d034a6e70a3de09fb8fd05010d1bd4fdff5f91a962cce96be75d"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "fileName": "./vcpkg.json",
+      "SPDXID": "SPDXRef-file-8",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "bdd3a19db5191b5e6300976f40dd7ab1950139bd3d563568714a94d6a768b80d"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    }
+  ]
+}

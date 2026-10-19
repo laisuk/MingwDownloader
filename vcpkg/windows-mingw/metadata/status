@@ -1,0 +1,119 @@
+Package: zlib
+Version: 1.3.1
+Depends: vcpkg-cmake:x64-windows
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 4908c1ac27e3565d24ddb9c8565c23dc907764f03da7adaa89644bccd59efd9a
+Description: A compression library
+Status: install ok installed
+
+Package: curl
+Version: 8.14.1
+Depends: vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: cb14c2cc69f32b24f80de3829561c0ce03ab5a1cc8aa805ff793ae68d6a6a323
+Description: A library for transferring data with URLs
+Default-Features: non-http, ssl
+Status: install ok installed
+
+Package: curl
+Feature: non-http
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Enables protocols beyond HTTP/HTTPS/HTTP2
+Status: install ok installed
+
+Package: curl
+Feature: schannel
+Depends: curl
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: SSL support (Secure Channel)
+Status: install ok installed
+
+Package: curl
+Feature: ssl
+Depends: curl
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Default SSL backend
+Status: install ok installed
+
+Package: curl
+Feature: sspi
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: SSPI support
+Status: install ok installed
+
+Package: curl
+Feature: tool
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Builds curl executable
+Status: install ok installed
+
+Package: libpng
+Version: 1.6.48
+Depends: vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 39acce2ca5620b893a4ded1ff2639ad2bf542cc4e8510437e2eb0813a7a59925
+Description: libpng is a library implementing an interface for reading and writing PNG (Portable Network Graphics) format files
+Status: install ok installed
+
+Package: libjpeg-turbo
+Version: 3.1.0
+Port-Version: 1
+Depends: vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 7c4b959214cd5f5841c40ef4eaeca6ea74f7f00de584814ec9acc9a774e33b46
+Description: libjpeg-turbo is a JPEG image codec that uses SIMD instructions (MMX, SSE2, NEON, AltiVec) to accelerate baseline JPEG compression and decompression on x86, x86-64, ARM, and PowerPC systems.
+Status: install ok installed
+
+Package: fltk
+Version: 1.3.11
+Depends: fltk:x64-windows, fontconfig, freetype, libjpeg-turbo, libpng, vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 56dbbeddc5d126d076287dc8ff6d183feac92217498d5207e16c85cd8d4af7b5
+Description: FLTK (pronounced fulltick) is a cross-platform C++ GUI toolkit for UNIX/Linux (X11), Microsoft Windows, and MacOS X. FLTK provides modern GUI functionality without the bloat and supports 3D graphics via OpenGL and its built-in GLUT emulation.
+Default-Features: opengl
+Status: install ok installed
+
+Package: fltk
+Feature: opengl
+Depends: opengl
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: OpenGL support
+Status: install ok installed
+
+Package: liblzma
+Version: 5.8.1
+Depends: vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 306c6c0e0a17e6147af0eaff53436a8c8a99d96516932a1256fe8c0d0ef0e77b
+Description: Compression library with an API similar to that of zlib.
+Status: install ok installed
+
+Package: libarchive
+Version: 3.7.8
+Port-Version: 1
+Depends: vcpkg-cmake:x64-windows, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 4a0c76a632a3fa1f78530a4b847cb00b0fea0a0de9185c371add33ef7ce9a2ce
+Description: Library for reading and writing streaming archives
+Status: install ok installed
+
+Package: libarchive
+Feature: lzma
+Depends: liblzma
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Lzma support
+Status: install ok installed

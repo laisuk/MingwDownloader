@@ -88,3 +88,13 @@ buildtrees/
 # ========================================
 *.res
 *.rc~
+# Checked-in MinGW dependency SDK (including static archives and imported tools).
+!vcpkg/windows-mingw/installed/
+!vcpkg/windows-mingw/installed/**/
+!vcpkg/windows-mingw/installed/**/*.a
+!vcpkg/windows-mingw/installed/**/*.exe
+!vcpkg/windows-mingw/installed/**
+
+# Checked-in MSVC dependency SDK, including static libraries and imported tools.
+!vcpkg/windows-msvc/installed/
+!vcpkg/windows-msvc/installed/**

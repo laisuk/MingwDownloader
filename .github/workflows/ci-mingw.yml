@@ -1,0 +1,68 @@
+name: CI (MinGW, windows-latest)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-mingw:
+    runs-on: windows-latest
+
+    env:
+      BUILD_TYPE: Release
+      VCPKG_TRIPLET: x64-mingw-static
+      MINGW_RELEASE: 14.2.0-rt_v12-rev2
+      MINGW_ARCHIVE: x86_64-14.2.0-release-win32-seh-msvcrt-rt_v12-rev2.7z
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Match the x86_64-win32-seh-msvcrt origin of the bundled libraries.
+      - name: Setup MinGW (x64, win32, SEH, MSVCRT)
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP $env:MINGW_ARCHIVE
+          $destination = Join-Path $env:RUNNER_TEMP "mingw-toolchain"
+          $url = "https://github.com/niXman/mingw-builds-binaries/releases/download/$env:MINGW_RELEASE/$env:MINGW_ARCHIVE"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          & "C:/Program Files/7-Zip/7z.exe" x $archive "-o$destination" -y
+          if ($LASTEXITCODE -ne 0) { throw "MinGW extraction failed." }
+
+          $bin = Join-Path $destination "mingw64/bin"
+          foreach ($tool in @("gcc.exe", "g++.exe", "windres.exe")) {
+            if (-not (Test-Path (Join-Path $bin $tool))) {
+              throw "Missing MinGW tool: $tool"
+            }
+          }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "MINGW_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$bin/g++.exe" -v
+          if ($LASTEXITCODE -ne 0) { throw "MinGW compiler check failed." }
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Configure (bundled MinGW SDK)
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Ninja" `
+            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
+            -DCMAKE_C_COMPILER="$env:MINGW_BIN/gcc.exe" `
+            -DCMAKE_CXX_COMPILER="$env:MINGW_BIN/g++.exe" `
+            -DCMAKE_RC_COMPILER="$env:MINGW_BIN/windres.exe" `
+            -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TRIPLET" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/windows-mingw/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build
+
+      - name: Upload artifact (exe)
+        uses: actions/upload-artifact@v7
+        with:
+          name: MingwDownloader-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}
+          path: |
+            build/MingwDownloader.exe
+            build/Release/MingwDownloader.exe
+          if-no-files-found: error

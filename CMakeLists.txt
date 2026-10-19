@@ -1,37 +1,43 @@
 cmake_minimum_required(VERSION 3.23)
 
-# -----------------------------
-# vcpkg (single owner)
-# -----------------------------
-if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    if (DEFINED ENV{VCPKG_WDIR})
-        set(CMAKE_TOOLCHAIN_FILE
-                "$ENV{VCPKG_WDIR}/scripts/buildsystems/vcpkg.cmake"
-                CACHE STRING "" FORCE)
-    else()
-        set(CMAKE_TOOLCHAIN_FILE
-                "D:/lib/vcpkg/scripts/buildsystems/vcpkg.cmake"
-                CACHE STRING "" FORCE)
-    endif()
+# Honor explicit external toolchains before compiler detection.
+if (NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{VCPKG_WDIR})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_WDIR}/scripts/buildsystems/vcpkg.cmake"
+            CACHE FILEPATH "Dependency toolchain")
 endif()
 
-# Choose triplet by toolchain
-if (NOT DEFINED VCPKG_TARGET_TRIPLET)
+project(MingwDownloader VERSION 1.0.2.0 LANGUAGES C CXX RC)
+
+# These adapters only locate prebuilt dependencies. Select after compiler
+# detection so Ninja/CLion can choose MSVC without an explicit compiler path.
+if (WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     if (MSVC)
-        set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
-#        list(APPEND CMAKE_PREFIX_PATH "D:/lib/vcpkg/installed/x64-windows-static")
-    else ()
-        set(VCPKG_TARGET_TRIPLET "x64-mingw-static" CACHE STRING "")
-    endif ()
-endif ()
-
-# Help MODULE-mode find_package(LibArchive) on Windows
-if (WIN32 AND DEFINED VCPKG_INSTALLED_DIR)
-    list(PREPEND CMAKE_PREFIX_PATH "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+        set(_dependency_sdk windows-msvc)
+    elseif (MINGW)
+        set(_dependency_sdk windows-mingw)
+    else()
+        message(FATAL_ERROR "Choose an explicit dependency toolchain for this compiler.")
+    endif()
+    set(CMAKE_TOOLCHAIN_FILE
+            "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/${_dependency_sdk}/scripts/buildsystems/vcpkg.cmake"
+            CACHE FILEPATH "Dependency toolchain")
+    unset(_dependency_sdk)
 endif()
 
-project(MingwDownloader VERSION 1.0.1.0 LANGUAGES C CXX RC)
-
+# Reapply our dependency-only adapter on reloads too: CMakeSystem.cmake may
+# have been created before automatic SDK selection on the first configure.
+if (CMAKE_TOOLCHAIN_FILE STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/windows-msvc/scripts/buildsystems/vcpkg.cmake" OR
+        CMAKE_TOOLCHAIN_FILE STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/windows-mingw/scripts/buildsystems/vcpkg.cmake")
+    include("${CMAKE_TOOLCHAIN_FILE}")
+endif()
+if (MINGW_DOWNLOADER_BUNDLED_MINGW AND
+        (NOT MINGW OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8))
+    message(FATAL_ERROR "The bundled MinGW SDK requires x64 MinGW (win32 threads, SEH, MSVCRT).")
+endif()
+if (MINGW_DOWNLOADER_BUNDLED_MSVC AND
+        (NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8))
+    message(FATAL_ERROR "The bundled MSVC SDK requires an x64 MSVC-compatible compiler.")
+endif()
 # -----------------------------
 # Language / standard
 # -----------------------------
@@ -51,6 +57,29 @@ option(MINGW_DOWNLOADER_STATIC_RUNTIME "Prefer static GCC/Stdlib where possible"
 find_package(FLTK CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(LibArchive REQUIRED)
+
+# The SDK contains static libarchive; CMake's FindLibArchive does not add its
+# private compression dependencies (the full vcpkg toolchain uses a wrapper).
+if (MINGW_DOWNLOADER_BUNDLED_MINGW OR MINGW_DOWNLOADER_BUNDLED_MSVC)
+    find_package(ZLIB REQUIRED)
+    find_package(liblzma CONFIG REQUIRED)
+    set(_sdk_prefix "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    if (MSVC)
+        set(_archive_name archive.lib)
+    else()
+        set(_archive_name libarchive.a)
+    endif()
+    set_target_properties(LibArchive::LibArchive PROPERTIES
+            IMPORTED_CONFIGURATIONS "DEBUG;RELEASE"
+            IMPORTED_LOCATION_DEBUG "${_sdk_prefix}/debug/lib/${_archive_name}"
+            IMPORTED_LOCATION_RELEASE "${_sdk_prefix}/lib/${_archive_name}"
+            MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+            MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+    set_property(TARGET LibArchive::LibArchive APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES ZLIB::ZLIB liblzma::liblzma)
+    unset(_sdk_prefix)
+    unset(_archive_name)
+endif ()
 
 # -----------------------------
 # Executable
@@ -158,8 +187,5 @@ if (MSVC)
     # GUI subsystem (no console)
     target_link_options(MingwDownloader PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
 
-    # Optional: if you want static MSVC runtime (/MT) in Release
-    # (Only do this if you really want "single exe" style for MSVC too)
-    # set_property(TARGET MingwDownloader PROPERTY
-    #     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    # The bundled MSVC adapter selects /MT (Release) and /MTd (Debug).
 endif ()

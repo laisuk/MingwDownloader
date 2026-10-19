@@ -10,11 +10,10 @@ jobs:
     env:
       BUILD_TYPE: Release
       VCPKG_TRIPLET: x64-windows-static
-      VCPKG_WDIR: ${{ github.workspace }}\vcpkg
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup MSVC (x64)
         uses: ilammy/msvc-dev-cmd@v1
@@ -22,77 +21,15 @@ jobs:
           arch: x64
 
       - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - name: Clone vcpkg
+      - name: Configure (bundled MSVC SDK)
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$env:VCPKG_WDIR"
-          cmd /c """$env:VCPKG_WDIR\bootstrap-vcpkg.bat"""
-
-      - name: Cache vcpkg artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            vcpkg\downloads
-            vcpkg\buildtrees
-            vcpkg\packages
-            vcpkg\installed
-            C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
-
-      - name: Install dependencies (vcpkg)
-        shell: pwsh
-        run: |
-          $vcpkgRoot = "$env:VCPKG_WDIR"
-          $vcpkg = "$vcpkgRoot\vcpkg.exe"
-
-          & $vcpkg --vcpkg-root $vcpkgRoot install `
-            "fltk[core,opengl]" `
-            "curl[core,non-http,sspi,ssl]" `
-            "libarchive[core,lzma]" `
-            --triplet $env:VCPKG_TRIPLET `
-            --host-triplet x64-windows
-
-      - name: Configure (CMake)
-        shell: pwsh
-        run: |
-          $vcpkgRoot = "$env:VCPKG_WDIR"
-          $trip = "$env:VCPKG_TRIPLET"
-          $env:VCPKG_ROOT = $vcpkgRoot
-          $env:VCPKG_INSTALLATION_ROOT = $vcpkgRoot
-
-          Write-Host "=== ENV DEBUG ==="
-          Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
-          Write-Host "VCPKG_WDIR       = $env:VCPKG_WDIR"
-          Write-Host "VCPKG_ROOT       = $env:VCPKG_ROOT"
-          Write-Host "VCPKG_TRIPLET    = $trip"
-          Write-Host "Toolchain path   = $vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
-          Write-Host "FLTK_DIR         = $vcpkgRoot\installed\$trip\share\fltk"
-          Write-Host "CURL_DIR         = $vcpkgRoot\installed\$trip\share\curl"
-          Write-Host ""
-
-          Write-Host "=== CHECK FILE EXISTENCE ==="
-          $toolchainOk = Test-Path "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
-          $fltkCfgOk   = Test-Path "$vcpkgRoot\installed\$trip\share\fltk\FLTKConfig.cmake"
-          $curlCfgOk   = Test-Path "$vcpkgRoot\installed\$trip\share\curl\CURLConfig.cmake"
-          Write-Host "Toolchain exists?  $toolchainOk"
-          Write-Host "FLTKConfig exists? $fltkCfgOk"
-          Write-Host "CURLConfig exists? $curlCfgOk"
-          Write-Host ""
-
-          if (-not $toolchainOk) { throw "Missing vcpkg toolchain file." }
-
-          # Optional: clean old cache if you previously configured with wrong toolchain
-          Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
-
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
-            -DCMAKE_TOOLCHAIN_FILE="$vcpkgRoot\scripts\buildsystems\vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET="$trip" `
-            -DVCPKG_INSTALLED_DIR="$vcpkgRoot\installed"
+            -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TRIPLET" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/windows-msvc/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         shell: pwsh
@@ -100,7 +37,7 @@ jobs:
           cmake --build build
 
       - name: Upload artifact (exe)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MingwDownloader-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}
           path: |

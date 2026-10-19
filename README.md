@@ -106,25 +106,56 @@ This ensures:
 
 ## 🛠 Build Instructions
 
-Requires:
+Requires CMake >= 3.23 and a compatible x64 MinGW-w64 compiler on PATH.
+The dependencies are bundled in `vcpkg/windows-mingw`; installing vcpkg or
+referring to `D:/lib/vcpkg` is no longer necessary for MinGW builds.
 
-- vcpkg (x64-mingw-static triplet)
-- CMake ≥ 3.23
-- MinGW-w64
+**Binary origin:** these `x64-mingw-static` libraries were compiled with **x86_64-win32-seh-msvcrt** MinGW (win32
+threads, SEH exceptions, MSVCRT).
+Use a matching compiler ABI; the locally verified compiler is GCC 14.2.0.
+See [the SDK notice](vcpkg/windows-mingw/NOTICE.md) for versions and licenses.
 
-Install dependencies:
+Configure in a fresh build directory (old caches may retain external paths):
 
-    vcpkg install fltk:x64-mingw-static
-    vcpkg install curl[core,schannel]:x64-mingw-static
-    vcpkg install libarchive[core,lzma]:x64-mingw-static
+```powershell
+cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j 4
+```
 
-Configure:
+The repository toolchain is selected automatically. To specify it explicitly:
 
-    cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+```powershell
+cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=vcpkg/windows-mingw/scripts/buildsystems/vcpkg.cmake
+```
 
-Build:
+For Debug, use a separate build directory and `-DCMAKE_BUILD_TYPE=Debug`.
+CI can use the same commands after installing the matching MinGW compiler;
+no dependency downloads or package-manager bootstrap are needed.
 
-    cmake --build build --config Release
+### MSVC (Visual Studio 2022, x64)
+
+Dependencies are also bundled in `vcpkg/windows-msvc` as `x64-windows-static`.
+CMake selects the SDK automatically after detecting MSVC, including with Ninja
+and CLion. The adapter selects the matching static CRT (`/MT`, or `/MTd` in Debug).
+See [the MSVC SDK notice](vcpkg/windows-msvc/NOTICE.md) for provenance and licenses.
+
+From a x64 Visual Studio developer shell:
+
+```powershell
+cmake -S . -B build-msvc -G Ninja -DCMAKE_BUILD_TYPE=Release -DVCPKG_TARGET_TRIPLET=x64-windows-static
+cmake --build build-msvc
+```
+
+In CLion, select the x64 Visual Studio toolchain. The existing Release profile's
+`-DVCPKG_TARGET_TRIPLET=x64-windows-static` is supported. Reset the CMake cache if
+it retains an external toolchain or old dependency paths. Debug uses a separate
+build directory and `-DCMAKE_BUILD_TYPE=Debug`.
+
+To select the SDK explicitly, pass
+`-DCMAKE_TOOLCHAIN_FILE=vcpkg/windows-msvc/scripts/buildsystems/vcpkg.cmake`.
+The MSVC CI workflow uses this SDK without cloning or bootstrapping vcpkg.
+An explicit external `CMAKE_TOOLCHAIN_FILE` or `VCPKG_WDIR` still takes precedence
+when you want to use an external dependency installation.
 
 The resulting executable is fully static and portable.
 
