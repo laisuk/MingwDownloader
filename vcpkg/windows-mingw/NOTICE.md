@@ -13,7 +13,6 @@ record every compiler option. Use an ABI-compatible toolchain.
 
 | Package                   | Installed version | License notice                |
 |---------------------------|-------------------|-------------------------------|
-| FLTK                      | 1.3.11            | share/fltk/copyright          |
 | curl                      | 8.14.1            | share/curl/copyright          |
 | libarchive (LZMA enabled) | 3.7.8#1           | share/libarchive/copyright    |
 | libjpeg-turbo             | 3.1.0#1           | share/libjpeg-turbo/copyright |
@@ -25,12 +24,12 @@ License paths are relative to `installed/x64-mingw-static`. Retain these upstrea
 notices when redistributing the SDK or application. The application's MIT license
 does not replace dependency licenses.
 
-The snapshot includes headers, Release/Debug static archives, package metadata,
-and the tools shipped by these ports (including fluid.exe, referenced by FLTK's
-imported CMake targets). Unrelated installed ports and build-time-only dependencies
-such as fontconfig/freetype are omitted: the Windows FLTK targets shipped here link
-to Windows system libraries, JPEG, PNG, and zlib. Curl uses Windows Schannel/SSPI;
-libarchive links zlib and LZMA. Windows system DLLs are still required at runtime.
+The snapshot includes headers, Release/Debug static libraries, package metadata,
+and tools for the retained ports. FLTK 1.4.5 is built separately from source by
+the application's CMake FetchContent configuration; legacy FLTK 1.3.11 files
+have been removed. JPEG and PNG remain bundled to preserve existing dependencies.
+Curl uses Windows Schannel/SSPI; libarchive uses zlib and LZMA. Windows system
+DLLs are still required at runtime.
 
 `scripts/buildsystems/vcpkg.cmake` is a project-owned, relocatable CMake SDK adapter,
 not a full vcpkg installation. It does not install or update packages. The main
@@ -38,7 +37,7 @@ CMakeLists adds libarchive's private static compression dependencies explicitly.
 `metadata/` retains the source package file lists and installed status (versions,
 features and ABI hashes). `SHA256SUMS.txt` records the bundled payload hashes.
 
-To refresh, copy the files enumerated by these seven ports' x64-mingw-static
+To refresh, copy the files enumerated by these six ports' x64-mingw-static
 installed file lists, preserving the installed directory layout and notices;
 refresh metadata and checksums, then verify fresh Release and Debug builds with
 the matching compiler. Package upgrades require rebuilding this binary snapshot.

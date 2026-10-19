@@ -73,24 +73,6 @@ Abi: 7c4b959214cd5f5841c40ef4eaeca6ea74f7f00de584814ec9acc9a774e33b46
 Description: libjpeg-turbo is a JPEG image codec that uses SIMD instructions (MMX, SSE2, NEON, AltiVec) to accelerate baseline JPEG compression and decompression on x86, x86-64, ARM, and PowerPC systems.
 Status: install ok installed
 
-Package: fltk
-Version: 1.3.11
-Depends: fltk:x64-windows, fontconfig, freetype, libjpeg-turbo, libpng, vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows, zlib
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: 56dbbeddc5d126d076287dc8ff6d183feac92217498d5207e16c85cd8d4af7b5
-Description: FLTK (pronounced fulltick) is a cross-platform C++ GUI toolkit for UNIX/Linux (X11), Microsoft Windows, and MacOS X. FLTK provides modern GUI functionality without the bloat and supports 3D graphics via OpenGL and its built-in GLUT emulation.
-Default-Features: opengl
-Status: install ok installed
-
-Package: fltk
-Feature: opengl
-Depends: opengl
-Architecture: x64-mingw-static
-Multi-Arch: same
-Description: OpenGL support
-Status: install ok installed
-
 Package: liblzma
 Version: 5.8.1
 Depends: vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows

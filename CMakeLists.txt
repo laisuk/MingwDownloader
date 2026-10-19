@@ -1,74 +1,93 @@
 cmake_minimum_required(VERSION 3.23)
 
-# Honor explicit external toolchains before compiler detection.
+# Respect a caller-provided toolchain. VCPKG_WDIR is the optional external
+# dependency SDK root used by this project.
 if (NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{VCPKG_WDIR})
     set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_WDIR}/scripts/buildsystems/vcpkg.cmake"
             CACHE FILEPATH "Dependency toolchain")
-endif()
+endif ()
 
-project(MingwDownloader VERSION 1.0.2.0 LANGUAGES C CXX RC)
+project(MingwDownloader VERSION 1.2.0.0 LANGUAGES C CXX RC)
 
-# These adapters only locate prebuilt dependencies. Select after compiler
-# detection so Ninja/CLion can choose MSVC without an explicit compiler path.
+# Bundled SDK adapters locate prebuilt libraries; they do not select compilers.
+# Detect the CLion-selected compiler first, then choose its matching SDK.
 if (WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     if (MSVC)
         set(_dependency_sdk windows-msvc)
     elseif (MINGW)
         set(_dependency_sdk windows-mingw)
-    else()
+    else ()
         message(FATAL_ERROR "Choose an explicit dependency toolchain for this compiler.")
-    endif()
+    endif ()
     set(CMAKE_TOOLCHAIN_FILE
             "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/${_dependency_sdk}/scripts/buildsystems/vcpkg.cmake"
             CACHE FILEPATH "Dependency toolchain")
     unset(_dependency_sdk)
-endif()
+endif ()
 
-# Reapply our dependency-only adapter on reloads too: CMakeSystem.cmake may
-# have been created before automatic SDK selection on the first configure.
+# Reapply bundled dependency adapters during CMake reloads. Their selection
+# may happen after project() on the first configuration.
 if (CMAKE_TOOLCHAIN_FILE STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/windows-msvc/scripts/buildsystems/vcpkg.cmake" OR
         CMAKE_TOOLCHAIN_FILE STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/windows-mingw/scripts/buildsystems/vcpkg.cmake")
     include("${CMAKE_TOOLCHAIN_FILE}")
-endif()
+endif ()
+
+# These prebuilt SDKs are x64-specific. Never mix them with another ABI.
 if (MINGW_DOWNLOADER_BUNDLED_MINGW AND
-        (NOT MINGW OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8))
+(NOT MINGW OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8))
     message(FATAL_ERROR "The bundled MinGW SDK requires x64 MinGW (win32 threads, SEH, MSVCRT).")
-endif()
+endif ()
 if (MINGW_DOWNLOADER_BUNDLED_MSVC AND
-        (NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8))
+(NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8))
     message(FATAL_ERROR "The bundled MSVC SDK requires an x64 MSVC-compatible compiler.")
-endif()
-# -----------------------------
-# Language / standard
-# -----------------------------
-set(CMAKE_CXX_STANDARD 17)
+endif ()
+
+# Application language and runtime policy.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# -----------------------------
-# Options
-# -----------------------------
 option(MINGW_DOWNLOADER_STATIC_RUNTIME "Prefer static GCC/Stdlib where possible" ON)
 
-# -----------------------------
-# Packages (from vcpkg)
-# -----------------------------
-#find_package(fltk CONFIG REQUIRED)
-find_package(FLTK CONFIG REQUIRED)
+# FLTK is built from source with the active CLion toolchain. Only the core
+# library is needed: this app does not use FLTK Forms, Images, or OpenGL.
+include(FetchContent)
+set(FLTK_BUILD_TEST OFF CACHE BOOL "" FORCE)
+set(FLTK_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(FLTK_BUILD_FLUID OFF CACHE BOOL "" FORCE)
+set(FLTK_BUILD_FLTK_OPTIONS OFF CACHE BOOL "" FORCE)
+set(FLTK_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(FLTK_BUILD_GL OFF CACHE BOOL "" FORCE)
+set(FLTK_BUILD_FORMS OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(fltk
+        GIT_REPOSITORY https://github.com/fltk/fltk.git
+        GIT_TAG release-1.4.5
+        GIT_SHALLOW TRUE)
+
+if (MSVC)
+    set(FLTK_MSVC_RUNTIME_DLL OFF CACHE BOOL
+            "Use static MSVC runtime for FLTK" FORCE)
+endif ()
+
+FetchContent_MakeAvailable(fltk)
+
+# Keep the remaining dependencies in the existing vcpkg SDK.
 find_package(CURL CONFIG REQUIRED)
 find_package(LibArchive REQUIRED)
+find_package(Threads REQUIRED)
 
-# The SDK contains static libarchive; CMake's FindLibArchive does not add its
-# private compression dependencies (the full vcpkg toolchain uses a wrapper).
+# The bundled SDK contains static libarchive. Unlike the full vcpkg wrapper,
+# CMake's FindLibArchive does not provide its private compression libraries.
+# Supply their imported locations and transitive link requirements explicitly.
 if (MINGW_DOWNLOADER_BUNDLED_MINGW OR MINGW_DOWNLOADER_BUNDLED_MSVC)
     find_package(ZLIB REQUIRED)
     find_package(liblzma CONFIG REQUIRED)
     set(_sdk_prefix "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
     if (MSVC)
         set(_archive_name archive.lib)
-    else()
+    else ()
         set(_archive_name libarchive.a)
-    endif()
+    endif ()
     set_target_properties(LibArchive::LibArchive PROPERTIES
             IMPORTED_CONFIGURATIONS "DEBUG;RELEASE"
             IMPORTED_LOCATION_DEBUG "${_sdk_prefix}/debug/lib/${_archive_name}"
@@ -81,111 +100,64 @@ if (MINGW_DOWNLOADER_BUNDLED_MINGW OR MINGW_DOWNLOADER_BUNDLED_MSVC)
     unset(_archive_name)
 endif ()
 
-# -----------------------------
-# Executable
-# -----------------------------
+# Preserve the existing main() entry point and Windows resource icon.
+# The Windows GUI subsystem is selected below per compiler.
 add_executable(MingwDownloader
         src/main.cpp
-        # add more .cpp here if there are split files
-        assets/app.rc
-)
+        assets/app.rc)
 
-# -----------------------------
-# Includes
-# -----------------------------
-# Put single-include json.hpp here:
-#   third_party/nlohmann/json.hpp
-# or:
-#   include/json.hpp
+# The project uses a vendored single-header nlohmann/json.hpp.
 target_include_directories(MingwDownloader PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/third_party
-)
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
-# -----------------------------
-# Link libs
-# -----------------------------
 target_link_libraries(MingwDownloader PRIVATE
-        fltk_images
-        fltk_forms
-        fltk_gl
-        fltk
+        fltk::fltk
         CURL::libcurl
         LibArchive::LibArchive
-)
+        Threads::Threads)
+
 if (WIN32)
     target_link_libraries(MingwDownloader PRIVATE ole32 shell32)
+    target_compile_definitions(MingwDownloader PRIVATE
+            UNICODE
+            _UNICODE)
 endif ()
 
-# -----------------------------
-# Threading
-# -----------------------------
-# (Needed if you use std::thread; harmless otherwise)
-# Only prefer pthread on non-Windows
-if (NOT WIN32)
-    set(THREADS_PREFER_PTHREAD_FLAG ON)
+# These definitions match the project's prebuilt static CURL/NGHTTP2/SSL SDK.
+# Revisit them if switching to shared or differently configured dependencies.
+if (WIN32 AND (MINGW OR MSVC))
+    target_compile_definitions(MingwDownloader PRIVATE
+            NGHTTP2_STATICLIB
+            CURL_STATICLIB
+            NO_SSL_DL)
 endif ()
-find_package(Threads REQUIRED)
-target_link_libraries(MingwDownloader PRIVATE
-        Threads::Threads
-)
 
-# -----------------------------
-# Compile definitions (common)
-# -----------------------------
-target_compile_definitions(MingwDownloader PRIVATE
-        UNICODE
-        _UNICODE
-)
-
-# -----------------------------
-# MinGW / GCC
-# -----------------------------
 if (MINGW)
     target_compile_options(MingwDownloader PRIVATE
             -Wall -Wextra
             $<$<CONFIG:Release>:-O2>
             $<$<CONFIG:Release>:-ffunction-sections>
-            $<$<CONFIG:Release>:-fdata-sections>
-    )
+            $<$<CONFIG:Release>:-fdata-sections>)
 
-    target_compile_definitions(MingwDownloader PRIVATE
-            NGHTTP2_STATICLIB
-            CURL_STATICLIB
-            NO_SSL_DL
-    )
-
-    # GUI subsystem (no console)
-    target_link_options(MingwDownloader PRIVATE -mwindows)
-
-    # Size / dead code stripping (Release)
+    # Hide the console and discard unused sections in Release builds.
     target_link_options(MingwDownloader PRIVATE
+            -mwindows
             $<$<CONFIG:Release>:-Wl,--gc-sections>
-            $<$<CONFIG:Release>:-s>
-    )
+            $<$<CONFIG:Release>:-s>)
 
-    # Optional: keep it "single exe" friendly
+    # Static compiler runtime for portable MinGW distributions. This does not
+    # guarantee that all third-party or operating-system DLLs are absent.
     if (MINGW_DOWNLOADER_STATIC_RUNTIME)
         target_link_options(MingwDownloader PRIVATE
                 -static
                 -static-libgcc
-                -static-libstdc++
-        )
+                -static-libstdc++)
     endif ()
-endif ()
-
-# -----------------------------
-# MSVC
-# -----------------------------
-if (MSVC)
-    target_compile_definitions(MingwDownloader PRIVATE
-            NGHTTP2_STATICLIB
-            CURL_STATICLIB
-            NO_SSL_DL
-    )
-
-    # GUI subsystem (no console)
-    target_link_options(MingwDownloader PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
-
-    # The bundled MSVC adapter selects /MT (Release) and /MTd (Debug).
+elseif (MSVC)
+    # main.cpp defines main(), not WinMain(). Keep the CRT entry-point bridge.
+    target_link_options(MingwDownloader PRIVATE
+            /SUBSYSTEM:WINDOWS
+            /ENTRY:mainCRTStartup)
+    # The bundled MSVC SDK adapter selects /MT (Release) and /MTd (Debug).
 endif ()

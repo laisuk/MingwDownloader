@@ -107,7 +107,8 @@ This ensures:
 ## 🛠 Build Instructions
 
 Requires CMake >= 3.23 and a compatible x64 MinGW-w64 compiler on PATH.
-The dependencies are bundled in `vcpkg/windows-mingw`; installing vcpkg or
+FLTK 1.4.5 is built from source using CMake FetchContent (only `fltk::fltk`).
+The remaining dependencies are bundled in `vcpkg/windows-mingw`; installing vcpkg or
 referring to `D:/lib/vcpkg` is no longer necessary for MinGW builds.
 
 **Binary origin:** these `x64-mingw-static` libraries were compiled with **x86_64-win32-seh-msvcrt** MinGW (win32
@@ -130,7 +131,8 @@ cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOL
 
 For Debug, use a separate build directory and `-DCMAKE_BUILD_TYPE=Debug`.
 CI can use the same commands after installing the matching MinGW compiler;
-no dependency downloads or package-manager bootstrap are needed.
+FLTK source is fetched on first configure unless already populated; no
+package-manager bootstrap is needed.
 
 ### MSVC (Visual Studio 2022, x64)
 

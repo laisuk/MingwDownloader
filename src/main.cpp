@@ -30,6 +30,7 @@
 
 #include <atomic>
 #include <filesystem>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -47,23 +48,35 @@ using json = nlohmann::json;
 // Models / parsing
 // ============================================================
 
-enum class Arch { Any, I686, X86_64 };
+namespace {
+    enum class Arch { Any, I686, X86_64 };
+}
 
-enum class MRT { Any, Posix, Win32, Mcf };
+namespace {
+    enum class MRT { Any, Posix, Win32, Mcf };
+}
 
-enum class EXC { Any, Seh, Dwarf };
+namespace {
+    enum class EXC { Any, Seh, Dwarf };
+}
 
-enum class CRT { Any, Ucrt, Msvcrt };
+namespace {
+    enum class CRT { Any, Ucrt, Msvcrt };
+}
 
-enum class RT { Any, V13 };
+namespace {
+    enum class RT { Any, V13, V14 };
+}
 
-struct AssetInfo {
-    Arch arch = Arch::Any;
-    MRT mrt = MRT::Any;
-    EXC exc = EXC::Any;
-    CRT crt = CRT::Any;
-    RT rt = RT::Any;
-};
+namespace {
+    struct AssetInfo {
+        Arch arch = Arch::Any;
+        MRT mrt = MRT::Any;
+        EXC exc = EXC::Any;
+        CRT crt = CRT::Any;
+        RT rt = RT::Any;
+    };
+}
 
 static bool has_token(const std::string &s, const char *tok) {
     return s.find(tok) != std::string::npos;
@@ -90,33 +103,43 @@ static AssetInfo parse_asset_name(const std::string &name) {
     else if (has_token(name, "-msvcrt-")) info.crt = CRT::Msvcrt;
 
     // RT
-    if (has_token(name, "-rt_v13-") || has_token(name, "-rt_v13.")) info.rt = RT::V13;
+    if (has_token(name, "-rt_v13-") || has_token(name, "-rt_v13.")) {
+        info.rt = RT::V13;
+    } else if (has_token(name, "-rt_v14-") || has_token(name, "-rt_v14.")) {
+        info.rt = RT::V14;
+    }
 
     return info;
 }
 
-struct Filters {
-    Arch arch = Arch::Any;
-    MRT mrt = MRT::Any;
-    EXC exc = EXC::Any;
-    CRT crt = CRT::Any;
-    RT rt = RT::Any;
-};
+namespace {
+    struct Filters {
+        Arch arch = Arch::Any;
+        MRT mrt = MRT::Any;
+        EXC exc = EXC::Any;
+        CRT crt = CRT::Any;
+        RT rt = RT::Any;
+    };
+}
 
 static Filters gFilters{};
 
-struct Asset {
-    std::string name;
-    long long size = 0;
-    std::string url;
-    AssetInfo info; // parsed from `name`
-};
+namespace {
+    struct Asset {
+        std::string name;
+        long long size = 0;
+        std::string url;
+        AssetInfo info; // parsed from `name`
+    };
+}
 
-struct Release {
-    std::string tag;
-    std::string published_at;
-    std::vector<Asset> assets;
-};
+namespace {
+    struct Release {
+        std::string tag;
+        std::string published_at;
+        std::vector<Asset> assets;
+    };
+}
 
 static std::vector<Release> gReleases;
 
@@ -129,21 +152,32 @@ static Fl_Hold_Browser *gAssets = nullptr;
 static Fl_Progress *gProgress = nullptr;
 static Fl_Box *gStatus = nullptr;
 
-static std::atomic<bool> gCancel{false};
-static std::atomic<int> gLastCurlResult{0}; // stores CURLcode
-static std::atomic<double> gProgressValue{0.0}; // progress %
-static std::atomic<int> gRefreshStage{0};
+static std::atomic gCancel{false};
+static std::atomic gLastCurlResult{0}; // stores CURLcode
+static std::atomic gProgressValue{0.0}; // progress %
+// Only the UI thread owns widgets and the published release list.
+// Workers publish completed results under a mutex and wake the UI thread.
+static std::thread gRefreshThread;
+static std::thread gDownloadThread;
+static bool gRefreshBusy = false; // UI thread only
+static bool gDownloadBusy = false; // UI thread only
+static std::mutex gRefreshMutex;
+static std::vector<Release> gPendingReleases;
+static std::mutex gStatusMutex;
+static std::string gPendingStatus;
+static std::mutex gExtractErrorMutex;
+static std::atomic gRefreshStage{0};
 // 0 = none
 // 1 = network error
 // 2 = JSON parse error
 // 3 = success (releases already in gReleases)
 
-static std::atomic<bool> gDoExtract{false};
-static std::atomic<int> gExtractOk{0}; // 0=none, 1=ok, -1=fail
+static std::atomic gDoExtract{false};
+static std::atomic gExtractOk{0}; // 0=none, 1=ok, -1=fail
 static std::string gExtractErr;
 
-static std::atomic<int> gExtractTotal{0};
-static std::atomic<int> gExtractDone{0};
+static std::atomic gExtractTotal{0};
+static std::atomic gExtractDone{0};
 // static std::atomic<int> gUiMode{0}; // 0=download, 1=extract
 
 static Fl_Input *gOutDirInput = nullptr;
@@ -169,7 +203,7 @@ static size_t write_callback(void *contents, const size_t size, const size_t nMe
 // GitHub API (fetch + parse)
 // ============================================================
 
-std::string fetch_releases_json() {
+static std::string fetch_releases_json() {
     CURL *curl = curl_easy_init();
     if (!curl) return {};
 
@@ -192,13 +226,11 @@ std::string fetch_releases_json() {
 }
 
 // ============================================================
-static bool parse_releases(const std::string &data) {
-    gReleases.clear();
+static bool parse_releases(const std::string &data, std::vector<Release> &result) {
+    result.clear();
 
     try {
-        json j = json::parse(data);
-
-        for (auto &r: j) {
+        for (json j = json::parse(data); auto &r: j) {
             Release rel;
             rel.tag = r.value("tag_name", "");
             rel.published_at = r.value("published_at", "");
@@ -217,7 +249,7 @@ static bool parse_releases(const std::string &data) {
             }
 
             if (!rel.tag.empty())
-                gReleases.push_back(std::move(rel));
+                result.push_back(std::move(rel));
         }
     } catch (...) {
         return false;
@@ -350,7 +382,9 @@ static void on_filters_changed(Fl_Widget *, void *) {
             break;
         case 1: gFilters.rt = RT::V13;
             break;
-        default: ;
+        case 2: gFilters.rt = RT::V14;
+            break;
+        default: break;
     }
 
     rebuild_asset_list_for_release(gRelease->value());
@@ -371,8 +405,18 @@ static void on_reset_filters(Fl_Widget *, void *) {
 // ============================================================
 
 static void awake_download_done(void *) {
-    if (const int res = gLastCurlResult.load(); res == CURLE_OK) set_status("Download complete.");
-    else set_status("Download failed or cancelled.");
+    // This is the single final notification for download AND optional extraction.
+    gDownloadBusy = false;
+    if (gExtractOk.load() == 1) {
+        set_status("Extract complete.");
+    } else if (gExtractOk.load() == -1) {
+        std::lock_guard lock(gExtractErrorMutex);
+        set_status("Extract failed: " + gExtractErr);
+    } else if (gLastCurlResult.load() == CURLE_OK) {
+        set_status("Download complete.");
+    } else {
+        set_status("Download failed or cancelled.");
+    }
     gProgress->value(0);
     gProgress->redraw();
 }
@@ -655,17 +699,10 @@ static bool extract_archive_to_dir(const std::string &archivePath,
     }
 }
 
-static void awake_extract_done(void *) {
-    if (gExtractOk.load() == 1) {
-        set_status("Extract complete.");
-    } else if (gExtractOk.load() == -1) {
-        set_status(std::string("Extract failed: " + gExtractErr));
-    }
-}
 
 // ------ Download helpers ------
-static size_t file_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
-    FILE *const fp = static_cast<FILE *>(userdata);
+static size_t file_write_cb(const void *ptr, const size_t size, const size_t nmemb, void *userdata) {
+    const auto fp = static_cast<FILE *>(userdata);
     if (!fp) return 0;
 
     // size*nmemb is what cURL expects caller to consume
@@ -674,15 +711,28 @@ static size_t file_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata
     return written;
 }
 
-static std::string gUiText;
-
+// The mutex protects the message between worker writes and UI reads.
+// Coalescing intermediate status messages is intentional.
 static void awake_set_status(void *) {
-    set_status(gUiText);
+    std::string message; {
+        std::lock_guard lock(gStatusMutex);
+        message = gPendingStatus;
+    }
+    // A completion callback may already have set the final status.
+    if (gDownloadBusy)
+        set_status(message);
 }
 
-static void post_status(const char *s) {
-    gUiText = s;
+static void post_status(const char *s) { {
+        std::lock_guard lock(gStatusMutex);
+        gPendingStatus = s;
+    }
     Fl::awake(awake_set_status);
+}
+
+static void awake_reset_progress(void *) {
+    gProgress->value(0);
+    gProgress->redraw();
 }
 
 static void download_file(const std::string &url, const std::string &outPath) {
@@ -724,7 +774,6 @@ static void download_file(const std::string &url, const std::string &outPath) {
     curl_easy_cleanup(curl);
 
     gLastCurlResult = static_cast<int>(res);
-    Fl::awake(awake_download_done);
 
     // Extract
     // Optional extract: out_dir / artifact_name /
@@ -738,8 +787,7 @@ static void download_file(const std::string &url, const std::string &outPath) {
 
         // ---- PASS 1: COUNT ENTRIES ----
         post_status("Counting archive entries...");
-        gProgress->value(0);
-        gProgress->redraw();
+        Fl::awake(awake_reset_progress);
 
         std::string c_err;
 
@@ -758,18 +806,21 @@ static void download_file(const std::string &url, const std::string &outPath) {
         if (std::string err; extract_archive_to_dir(ap.string(), extractDir.string(), err)) {
             gExtractOk = 1;
         } else {
+            {
+                std::lock_guard lock(gExtractErrorMutex);
+                gExtractErr = err;
+            }
             gExtractOk = -1;
-            gExtractErr = err;
         }
-
-        Fl::awake(awake_extract_done);
     }
+    Fl::awake(awake_download_done);
 }
 
 // ============================================================
 // Button Callbacks
 // ============================================================
 static void awake_refresh_done(void *) {
+    gRefreshBusy = false;
     const int st = gRefreshStage.load();
 
     if (st == 1) {
@@ -781,16 +832,23 @@ static void awake_refresh_done(void *) {
         return;
     }
     if (st == 3) {
+        {
+            std::lock_guard lock(gRefreshMutex);
+            gReleases = std::move(gPendingReleases);
+        }
         populate_release_choice();
         set_status("Releases loaded.");
     }
 }
 
 static void on_refresh(Fl_Widget *, void *) {
+    if (gRefreshBusy) return; // Prevent overlapping refresh workers.
+    if (gRefreshThread.joinable()) gRefreshThread.join();
+    gRefreshBusy = true;
     set_status("Fetching releases...");
     gProgress->value(0);
 
-    std::thread([] {
+    gRefreshThread = std::thread([] {
         const std::string data = fetch_releases_json();
         if (data.empty()) {
             gRefreshStage = 1;
@@ -798,18 +856,26 @@ static void on_refresh(Fl_Widget *, void *) {
             return;
         }
 
-        if (const bool ok = parse_releases(data); !ok) {
+        std::vector<Release> parsed;
+        if (!parse_releases(data, parsed)) {
             gRefreshStage = 2;
             Fl::awake(awake_refresh_done);
             return;
+        } {
+            std::lock_guard lock(gRefreshMutex);
+            gPendingReleases = std::move(parsed);
         }
-
         gRefreshStage = 3;
         Fl::awake(awake_refresh_done);
-    }).detach();
+    });
 }
 
 static void start_download(const bool extract_after) {
+    if (gDownloadBusy) {
+        set_status("A download or extraction is already running.");
+        return;
+    }
+    if (gDownloadThread.joinable()) gDownloadThread.join();
     const int r_idx = gRelease->value();
     const int a_row = gAssets->value();
 
@@ -839,20 +905,23 @@ static void start_download(const bool extract_after) {
 
     std::string outPath = outDir;
     if (!outPath.empty() && outPath.back() != '\\' && outPath.back() != '/')
-        outPath += "\\";
+        outPath += '\\';
     outPath += asset.name;
 
     gCancel = false;
     gDoExtract = extract_after;
-    gExtractOk = 0;
-    gExtractErr.clear();
+    gExtractOk = 0; {
+        std::lock_guard lock(gExtractErrorMutex);
+        gExtractErr.clear();
+    }
+    gDownloadBusy = true;
 
     set_status(extract_after ? "Downloading (then extract)..." : "Downloading...");
     gProgress->value(0);
 
-    std::thread([asset, outPath] {
+    gDownloadThread = std::thread([asset, outPath] {
         download_file(asset.url, outPath);
-    }).detach();
+    });
 }
 
 static void on_download(Fl_Widget *, void *) {
@@ -864,6 +933,7 @@ static void on_download_extract(Fl_Widget *, void *) {
 }
 
 static void on_cancel(Fl_Widget *, void *) {
+    if (!gDownloadBusy) return;
     gCancel = true;
     set_status("Cancel requested...");
 }
@@ -947,7 +1017,7 @@ int main() {
     make_filter(gMrt, "MRT", "Any|posix|win32|mcf");
     make_filter(gExc, "EXC", "Any|seh|dwarf");
     make_filter(gCrt, "CRT", "Any|ucrt|msvcrt");
-    make_filter(gRt, "RT", "Any|rt_v13");
+    make_filter(gRt, "RT", "Any|rt_v13|rt_v14");
 
     auto *btnReset = new Fl_Button(W - M - resetW, filterY + FILTER_LABEL_H + 2, resetW, FILTER_BOX_H, "Reset");
     btnReset->callback(on_reset_filters);
@@ -1024,6 +1094,12 @@ int main() {
 #endif
 
     const int result = Fl::run();
+
+    // Never unload libcurl or destroy application state while a worker uses it.
+    // Refresh currently has no cancellation; it must finish before shutdown.
+    gCancel = true;
+    if (gDownloadThread.joinable()) gDownloadThread.join();
+    if (gRefreshThread.joinable()) gRefreshThread.join();
     curl_global_cleanup();
     return result;
 }
