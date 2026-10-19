@@ -45,13 +45,17 @@ jobs:
       - name: Configure (bundled MinGW SDK)
         shell: pwsh
         run: |
+          # CMake writes the RC compiler path into generated CMake source.
+          # Use forward slashes so Windows paths cannot become escape sequences.
+          $mingwBin = $env:MINGW_BIN.Replace('\', '/')
+          $toolchain = "$env:GITHUB_WORKSPACE/vcpkg/windows-mingw/scripts/buildsystems/vcpkg.cmake".Replace('\', '/')
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
-            -DCMAKE_C_COMPILER="$env:MINGW_BIN/gcc.exe" `
-            -DCMAKE_CXX_COMPILER="$env:MINGW_BIN/g++.exe" `
-            -DCMAKE_RC_COMPILER="$env:MINGW_BIN/windres.exe" `
+            -DCMAKE_C_COMPILER="$mingwBin/gcc.exe" `
+            -DCMAKE_CXX_COMPILER="$mingwBin/g++.exe" `
+            -DCMAKE_RC_COMPILER="$mingwBin/windres.exe" `
             -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TRIPLET" `
-            -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/windows-mingw/scripts/buildsystems/vcpkg.cmake"
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain"
 
       - name: Build
         shell: pwsh
