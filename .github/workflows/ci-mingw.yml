@@ -6,12 +6,13 @@ on:
 jobs:
   build-mingw:
     runs-on: windows-latest
+    timeout-minutes: 45
 
     env:
       BUILD_TYPE: Release
       VCPKG_TRIPLET: x64-mingw-static
-      MINGW_RELEASE: 14.2.0-rt_v12-rev2
-      MINGW_ARCHIVE: x86_64-14.2.0-release-win32-seh-msvcrt-rt_v12-rev2.7z
+      MINGW_RELEASE: 16.2.0-rt_v14-rev1
+      MINGW_ARCHIVE: x86_64-16.2.0-release-win32-seh-msvcrt-rt_v14-rev1.7z
 
     steps:
       - name: Checkout
@@ -60,7 +61,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          cmake --build build
+          cmake --build build --config Release --parallel 4
 
       - name: Upload artifact (exe)
         uses: actions/upload-artifact@v7

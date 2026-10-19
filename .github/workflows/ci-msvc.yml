@@ -6,10 +6,13 @@ on:
 jobs:
   build-msvc:
     runs-on: windows-latest
+    timeout-minutes: 45
 
     env:
       BUILD_TYPE: Release
       VCPKG_TRIPLET: x64-windows-static
+      FLTK_TAG: release-1.4.5
+      FLTK_SOURCE_DIR: ${{ github.workspace }}/.ci-cache/fltk-src
 
     steps:
       - name: Checkout
@@ -23,23 +26,47 @@ jobs:
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - name: Configure (bundled MSVC SDK)
+      # Cache only the upstream FLTK source, not a CMake build directory.
+      # Generated build files contain machine-specific paths and settings.
+      - name: Cache FLTK 1.4.5 source
+        id: fltk-cache
+        uses: actions/cache@v6
+        with:
+          path: .ci-cache/fltk-src
+          key: fltk-source-${{ runner.os }}-release-1.4.5
+
+      - name: Fetch FLTK source (cache miss)
+        if: steps.fltk-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          cmake -S . -B build -G "Ninja" `
+          New-Item -ItemType Directory -Force -Path (Split-Path $env:FLTK_SOURCE_DIR) | Out-Null
+          git clone --depth 1 --branch "$env:FLTK_TAG" `
+            https://github.com/fltk/fltk.git "$env:FLTK_SOURCE_DIR"
+          if ($LASTEXITCODE -ne 0) { throw 'FLTK source checkout failed.' }
+
+      - name: Configure (bundled MSVC SDK + static CRT)
+        shell: pwsh
+        run: |
+          $toolchain = "$env:GITHUB_WORKSPACE/vcpkg/windows-msvc/scripts/buildsystems/vcpkg.cmake".Replace('\', '/')
+          $fltkSource = $env:FLTK_SOURCE_DIR.Replace('\', '/')
+          cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
             -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TRIPLET" `
-            -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/vcpkg/windows-msvc/scripts/buildsystems/vcpkg.cmake"
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
+            -DFLTK_MSVC_RUNTIME_DLL=OFF `
+            -DFETCHCONTENT_SOURCE_DIR_FLTK="$fltkSource"
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed.' }
 
-      - name: Build
+      - name: Build (Release)
         shell: pwsh
         run: |
-          cmake --build build
+          cmake --build build --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC Release build failed.' }
 
       - name: Upload artifact (exe)
         uses: actions/upload-artifact@v7
         with:
-          name: MingwDownloader-${{ runner.os }}-${{ env.VCPKG_TRIPLET }}
+          name: MingwDownloader-Windows-${{ env.VCPKG_TRIPLET }}
           path: |
             build/MingwDownloader.exe
             build/Release/MingwDownloader.exe
