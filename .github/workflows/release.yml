@@ -1,0 +1,156 @@
+name: Release (MinGW + MSVC)
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '*-beta*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.compiler }})
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: mingw
+            triplet: x64-mingw-static
+            sdk: windows-mingw
+            package: MingwDownloader-Windows-MinGW-x64
+          - compiler: msvc
+            triplet: x64-windows-static
+            sdk: windows-msvc
+            package: MingwDownloader-Windows-MSVC-x64
+    env:
+      BUILD_TYPE: Release
+      MINGW_RELEASE: 16.2.0-rt_v14-rev1
+      MINGW_ARCHIVE: x86_64-16.2.0-release-win32-seh-msvcrt-rt_v14-rev1.7z
+      FLTK_TAG: release-1.4.5
+      FLTK_SOURCE_DIR: ${{ github.workspace }}/.ci-cache/fltk-src
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup MSVC (x64)
+        if: matrix.compiler == 'msvc'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup MinGW (x64, win32, SEH, MSVCRT)
+        if: matrix.compiler == 'mingw'
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP $env:MINGW_ARCHIVE
+          $destination = Join-Path $env:RUNNER_TEMP 'mingw-toolchain'
+          $url = "https://github.com/niXman/mingw-builds-binaries/releases/download/$env:MINGW_RELEASE/$env:MINGW_ARCHIVE"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          & 'C:/Program Files/7-Zip/7z.exe' x $archive "-o$destination" -y
+          if ($LASTEXITCODE -ne 0) { throw 'MinGW extraction failed.' }
+          $bin = Join-Path $destination 'mingw64/bin'
+          foreach ($tool in @('gcc.exe', 'g++.exe', 'windres.exe')) {
+            if (-not (Test-Path (Join-Path $bin $tool))) { throw "Missing MinGW tool: $tool" }
+          }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "MINGW_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$bin/g++.exe" -v
+          if ($LASTEXITCODE -ne 0) { throw 'MinGW compiler check failed.' }
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # Cache only source, never machine-specific build directories.
+      - name: Cache FLTK source
+        id: fltk-cache
+        uses: actions/cache@v6
+        with:
+          path: .ci-cache/fltk-src
+          key: fltk-source-${{ runner.os }}-release-1.4.5
+
+      - name: Fetch FLTK source (cache miss)
+        if: steps.fltk-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path (Split-Path $env:FLTK_SOURCE_DIR) | Out-Null
+          git clone --depth 1 --branch "$env:FLTK_TAG" https://github.com/fltk/fltk.git "$env:FLTK_SOURCE_DIR"
+          if ($LASTEXITCODE -ne 0) { throw 'FLTK source checkout failed.' }
+
+      - name: Configure (bundled SDK)
+        shell: pwsh
+        env:
+          SDK_NAME: ${{ matrix.sdk }}
+          VCPKG_TRIPLET: ${{ matrix.triplet }}
+          COMPILER: ${{ matrix.compiler }}
+        run: |
+          $toolchain = "$env:GITHUB_WORKSPACE/vcpkg/$env:SDK_NAME/scripts/buildsystems/vcpkg.cmake".Replace('\', '/')
+          $fltkSource = $env:FLTK_SOURCE_DIR.Replace('\', '/')
+          $args = @(
+            '-S', '.', '-B', 'build', '-G', 'Ninja',
+            "-DCMAKE_BUILD_TYPE=$env:BUILD_TYPE",
+            "-DVCPKG_TARGET_TRIPLET=$env:VCPKG_TRIPLET",
+            "-DCMAKE_TOOLCHAIN_FILE=$toolchain",
+            "-DFETCHCONTENT_SOURCE_DIR_FLTK=$fltkSource"
+          )
+          if ($env:COMPILER -eq 'mingw') {
+            $bin = $env:MINGW_BIN.Replace('\', '/')
+            $args += "-DCMAKE_C_COMPILER=$bin/gcc.exe"
+            $args += "-DCMAKE_CXX_COMPILER=$bin/g++.exe"
+            $args += "-DCMAKE_RC_COMPILER=$bin/windres.exe"
+          } else {
+            $args += '-DFLTK_MSVC_RUNTIME_DLL=OFF'
+          }
+          & cmake @args
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed.' }
+
+      - name: Build (Release)
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+
+      - name: Package executable
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ matrix.package }}
+        run: |
+          $exe = @('build/MingwDownloader.exe', 'build/Release/MingwDownloader.exe') |
+            Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw 'MingwDownloader.exe not found.' }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path $exe -DestinationPath "dist/$env:PACKAGE_NAME.zip" -Force
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.package }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: MingwDownloader-Windows-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
